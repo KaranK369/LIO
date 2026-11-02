@@ -1,0 +1,73 @@
+# =============================================================================
+#  LIO (lio_node) config for Ouster OS0-128 + internal IMU (runwayD dataset)
+#  GNSS-denied localization, Stage B front-end.
+# =============================================================================
+/**:
+    ros__parameters:
+        point_filter_num: 2            # keep good structure for 128-beam
+        max_iteration: 4
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0       # bounded local map
+        map_file_path: "./test.pcd"
+
+        common:
+            lid_topic:  "/ouster/points"
+            imu_topic:  "/ouster/imu"
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 3              # 2=Velodyne/Hesai, 3=Ouster, 5=Hesai
+            scan_line: 128             # 128 beams (Ouster OS0-128)
+            scan_rate: 10              # Ouster scan rate: 10 Hz
+            timestamp_unit: 3          # 0=second, 1=ms, 2=us, 3=ns (Ouster `t` field is in ns)
+            blind: 0.5                 # drop returns within 0.5 m of the sensor
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            det_range:     100.0
+            imu_init_samples: 100      # static start-up samples for gravity + gyro bias (stock: 10)
+            gyro_saturation: 4.3       # Ouster IMU gyro clips at +-250 deg/s (4.36 rad/s): inflate rotation noise when clipped
+            extrinsic_est_en:  false    # factory calibrated extrinsics
+            # os_sensor (the /ouster/points frame) w.r.t. os_imu. The previous value
+            # [-0.006253, 0.011775, 0.10825] was T_imu_prism (the total-station prism,
+            # ~11.6 cm above the sensor). Ouster factory imu_to_sensor translation is
+            # (6.253, -11.775, 7.645) mm, so the LiDAR origin in the IMU frame is its
+            # negation. Rotation: identity.
+            extrinsic_T: [-0.006253, 0.011775, -0.007645]
+            extrinsic_R: [ 1.0,  0.0,  0.0,
+                           0.0,  1.0,  0.0,
+                           0.0,  0.0,  1.0 ]
+
+        degeneracy:                    # solution remapping in the iEKF update (Zhang 2016)
+            enable: true               # projected-out directions are carried by the IMU
+            trans_thresh: 0.01         # normalised translation info eig (sums to 1; ~0.33 isotropic)
+            rot_thresh: 0.01           # normalised rotation info eig
+            soft: true                 # scale weak-direction info by lambda/thresh (hard=0 diverges on persistent degeneracy)
+            log: false
+
+        attitude:                      # gravity-referenced roll/pitch aiding (stops map+pose tilting together)
+            source: 2                  # 0 off, 1 IMU orientation (AHRS), 2 ground-plane normal (level-ground assumption)
+            kappa: 0.05                # info = kappa * LiDAR roll/pitch info (per-scan pull toward gravity)
+            sigma_floor_deg: 2.0       # minimum weight when the LiDAR barely sees roll/pitch
+            max_angle_deg: 30.0        # ignore an attitude measurement further off than this
+            # Ouster IMU has no orientation (and a ~3 deg accel bias): level-ground normal
+
+        publish:
+            scan_publish_en:  true     # publish /lio/cloud_registered (odom frame)
+            dense_publish_en: true
+            scan_bodyframe_pub_en: true
+            effect_map_en: true        # publish /lio/cloud_effected (inlier points used by iEKF)
+            map_en: true              # publish /lio/map (1 scan/s, one point per publish.map_voxel)
+
+        frames:                        # REP-105 output (published by backend_node): map -> odom -> base_frame
+            odom_frame: odom
+            base_frame: base_link
+            imu_frame: ""              # no robot TF in the dataset: the IMU is the base frame
+            publish_tf: true           # backend_node TF map->odom->base_frame (false: topics only)
+
+        pcd_save:
+            pcd_save_en: false         # /lio/save_map service writes /lio/map to map_file_path

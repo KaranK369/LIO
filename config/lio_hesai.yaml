@@ -1,0 +1,80 @@
+# =============================================================================
+#  LIO (lio_node) config for Phasma Sensor Platform (HESAI PandarXT-32 + Alphasense IMU)
+#  Hilti 2022 exp07 long_corridor bag (handheld; textbook corridor degeneracy)
+#  GNSS-denied localization, Stage B front-end.
+#
+#  Checked on the bag (exp07_long_corridor):
+#    * Hesai: header = first point time, per-point `timestamp` absolute + monotonic
+#    * XT-32 AND IMU are mounted UPSIDE DOWN (IMU reads -9.6 m/s^2 on z); the
+#      z-flip extrinsic agrees with gravity vs. the floor normal to 0.56 deg
+#    * 33-53 % of every scan is within 1 m, in fixed azimuth sectors: the operator
+#      and the device. They move WITH the sensor and pull the estimate toward
+#      "not moving" (corridor stall) -> blind 1.0 m (+ cloud_preprocess min_range)
+#    * Alphasense IMU @ 400 Hz, no orientation (AHRS) field; static for > 5 s at start
+#  Run:  ros2 launch copernicus_localization copernicus_localization.launch.py \
+#            config_file:=lio_hesai.yaml               (-> platform_hilti_handheld.yaml)
+# =============================================================================
+/**:
+    ros__parameters:
+        point_filter_num: 2            # ~60k pts/scan @ 32 beams
+        max_iteration: 4
+        filter_size_surf: 0.3          # narrow corridor: walls 1-3 m away, keep small features
+        filter_size_map: 0.3
+        cube_side_length: 1000.0       # bounded local map
+        map_file_path: "./test.pcd"
+
+        common:
+            lid_topic:  "/hesai/pandar"
+            imu_topic:  "/alphasense/imu"
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 2              # 2 = spinning; a `timestamp` field selects the Hesai handler
+            scan_line: 32
+            scan_rate: 10              # Hesai scan rate, Hz
+            timestamp_unit: 0          # 0=second (Hesai timestamps are absolute seconds)
+            blind: 1.0                 # drop operator/device returns (see header)
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            det_range:     100.0
+            imu_init_samples: 400      # 1 s @ 400 Hz static start-up (gravity + gyro bias)
+            extrinsic_est_en:  false    # factory calibrated extrinsics
+            # Phasma sensor platform: PandarXT-32 w.r.t. imu_sensor_frame
+            extrinsic_T: [-0.001, -0.00855, 0.055]
+            extrinsic_R: [1.11022302e-16, -1.0, 0.0,
+                          -1.0, 1.11022302e-16, -0.0,
+                           0.0, 0.0, -1.0 ]
+
+        degeneracy:                    # solution remapping in the iEKF update (Zhang 2016)
+            enable: true               # a long corridor is degenerate along its axis
+            trans_thresh: 0.01         # normalised translation info eig (sums to 1; ~0.33 isotropic)
+            rot_thresh: 0.01           # normalised rotation info eig
+            soft: true                 # scale weak-direction info by lambda/thresh (hard=0 diverges on persistent degeneracy)
+            log: false
+
+        attitude:                      # gravity-referenced roll/pitch aiding (stops map+pose tilting together)
+            source: 2                  # 0 off, 1 IMU orientation (AHRS), 2 ground-plane normal (level-ground assumption)
+            kappa: 0.05                # info = kappa * LiDAR roll/pitch info (per-scan pull toward gravity)
+            sigma_floor_deg: 2.0       # minimum weight when the LiDAR barely sees roll/pitch
+            max_angle_deg: 30.0        # ignore an attitude measurement further off than this
+            # Alphasense publishes no orientation -> indoor level-floor normal
+
+        publish:
+            scan_publish_en:  true     # publish /lio/cloud_registered (odom frame) (router + loop closure need it)
+            dense_publish_en: true
+            scan_bodyframe_pub_en: false
+            effect_map_en: false        # publish /lio/cloud_effected (inlier points used by iEKF)
+            map_en: false              # publish /lio/map (1 scan/s, one point per publish.map_voxel)
+
+        frames:                        # REP-105 output (published by backend_node): map -> odom -> base_frame
+            odom_frame: odom
+            base_frame: base_link
+            imu_frame: ""              # Phasma: the IMU is the base frame
+            publish_tf: true           # backend_node TF map->odom->base_frame (false: topics only)
+
+        pcd_save:
+            pcd_save_en: false         # /lio/save_map service writes /lio/map to map_file_path

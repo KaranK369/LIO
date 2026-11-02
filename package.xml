@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>copernicus_localization</name>
+  <version>0.0.0</version>
+  <description>Copernicus GNSS-denied multi-terrain localization: LiDAR-inertial odometry
+    (iEKF + ikd-tree map, derived from FAST-LIO2), scene-adaptive preprocessing, landmarks,
+    loop closure and an iSAM2 pose-graph backend. Publishes map->odom->base (REP-105).</description>
+  <maintainer email="akarsh@todo.todo">akarsh</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <!-- Stage A-E nodes (C++) -->
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>pcl_conversions</depend>
+  <depend>libpcl-all-dev</depend>
+  <depend>eigen</depend>
+  <!-- Stage E backend (optional; node only builds when GTSAM is present) -->
+  <depend>gtsam</depend>
+
+  <!-- Localizability / LoopConstraint / LandmarkObs / EnvironmentState messages -->
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <!-- map_matching_node.py (OSM road map-matching utility) -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

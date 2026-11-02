@@ -1,0 +1,68 @@
+# =============================================================================
+#  LIO (lio_node) config for Husky A300 (Ouster OS1-32 + /ouster/imu) — husky_garage3
+#  GNSS-denied localization, Stage B front-end.
+# =============================================================================
+/**:
+    ros__parameters:
+        point_filter_num: 2            # keep good structure for 32-beam
+        max_iteration: 4
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0       # bounded local map
+        map_file_path: "./test.pcd"
+
+        common:
+            lid_topic:  "/ouster/points"
+            imu_topic:  "/ouster/imu"
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 3              # 2=Velodyne/Hesai, 3=Ouster, 5=Hesai
+            scan_line: 32
+            scan_rate: 10              # Ouster scan rate, Hz
+            timestamp_unit: 3          # 0=second, 1=ms, 2=us, 3=ns (Ouster `t` is ns)
+            blind: 0.5                 # drop returns within 0.5 m of the sensor
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            det_range:     100.0
+            imu_init_samples: 100      # static start-up samples for gravity + gyro bias
+            extrinsic_est_en:  true    # online refinement
+            # Husky A300: os_lidar w.r.t. os_imu
+            #   R = Rz(pi)  (os_lidar is yawed 180 deg relative to os_sensor / the robot)
+            extrinsic_T: [ -0.006253, 0.011775, 0.028535 ]
+            extrinsic_R: [ -1.0,  0.0,  0.0,
+                            0.0, -1.0,  0.0,
+                            0.0,  0.0,  1.0 ]
+
+        degeneracy:                    # solution remapping in the iEKF update (Zhang 2016)
+            enable: true               # identity in well-constrained scenes
+            trans_thresh: 0.01
+            rot_thresh: 0.01
+            soft: true
+            log: false
+
+        attitude:                      # gravity-referenced roll/pitch aiding
+            source: 0                  # 0=off (ouster/imu is raw 6-axis without AHRS orientation)
+            kappa: 0.05
+            sigma_floor_deg: 2.0
+            max_angle_deg: 30.0
+
+        publish:
+            scan_publish_en:  true     # publish /lio/cloud_registered (odom frame)
+            dense_publish_en: true
+            scan_bodyframe_pub_en: false
+            effect_map_en: false
+            map_en: false
+
+        frames:                        # REP-105 output (published by backend_node): map -> odom -> base_frame
+            odom_frame: odom
+            base_frame: base_footprint
+            imu_frame: "os_imu"        # Husky TF root is base_footprint; base<-os_imu from the robot / bag /tf_static
+            publish_tf: true           # backend_node TF map->odom->base_frame (false: topics only)
+
+        pcd_save:
+            pcd_save_en: false

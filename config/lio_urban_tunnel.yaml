@@ -1,0 +1,69 @@
+# =============================================================================
+#  LIO (lio_node) config for GEODE urban_tunnel (same VLP-16 + IMU kit as bridge2)
+#  GNSS-denied localization, Stage B front-end.
+# =============================================================================
+/**:
+    ros__parameters:
+        point_filter_num: 1            # 16-beam VLP-16 (keep all valid points for good structure)
+        max_iteration: 4
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0       # bounded local map
+        map_file_path: "./test.pcd"
+
+        common:
+            lid_topic:  "/velodyne_points"
+            imu_topic:  "/imu/data"
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 2              # 2=Velodyne/Hesai, 3=Ouster, 5=Hesai
+            scan_line: 16              # 16 beams (Velodyne VLP-16)
+            scan_rate: 10              # Velodyne scan rate: 10 Hz
+            timestamp_unit: 0          # 0=second, 1=ms, 2=us, 3=ns (Velodyne `time` field is in seconds)
+            blind: 0.5                 # drop returns within 0.5 m of the sensor
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            det_range:     100.0
+            imu_init_samples: 100      # static start-up samples for gravity + gyro bias (stock: 10)
+            extrinsic_est_en:  false    # factory calibrated extrinsics
+
+            # Extrinsics: Velodyne VLP-16 w.r.t. IMU
+            extrinsic_T: [0.010965, -0.086864, 0.060426]
+            extrinsic_R: [ 0.9989892,  0.044487,  -0.0064406,
+                          -0.0446353,  0.9986885, -0.0250789,
+                           0.0053164,  0.025341,   0.9996647 ]
+
+        degeneracy:                    # solution remapping in the iEKF update (Zhang 2016)
+            enable: true               # projected-out directions are carried by the IMU
+            trans_thresh: 0.01         # normalised translation info eig (sums to 1; ~0.33 isotropic)
+            rot_thresh: 0.01           # normalised rotation info eig
+            soft: true                 # scale weak-direction info by lambda/thresh (hard=0 diverges on persistent degeneracy)
+            log: false
+
+        attitude:                      # gravity-referenced roll/pitch aiding (stops map+pose tilting together)
+            source: 1                  # 0 off, 1 IMU orientation (AHRS), 2 ground-plane normal (level-ground assumption)
+            kappa: 0.05                # info = kappa * LiDAR roll/pitch info (per-scan pull toward gravity)
+            sigma_floor_deg: 2.0       # minimum weight when the LiDAR barely sees roll/pitch
+            max_angle_deg: 30.0        # ignore an attitude measurement further off than this
+            # Xsens publishes a gravity-referenced AHRS orientation
+
+        publish:
+            scan_publish_en:  true     # publish /lio/cloud_registered (odom frame)
+            dense_publish_en: true
+            scan_bodyframe_pub_en: true
+            effect_map_en: true        # publish /lio/cloud_effected (inlier points used by iEKF)
+            map_en: true              # publish /lio/map (1 scan/s, one point per publish.map_voxel)
+
+        frames:                        # REP-105 output (published by backend_node): map -> odom -> base_frame
+            odom_frame: odom
+            base_frame: base_link
+            imu_frame: ""              # GEODE bag has no robot TF: the IMU is the base frame
+            publish_tf: true           # backend_node TF map->odom->base_frame (false: topics only)
+
+        pcd_save:
+            pcd_save_en: false         # /lio/save_map service writes /lio/map to map_file_path

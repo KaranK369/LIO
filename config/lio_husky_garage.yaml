@@ -1,0 +1,77 @@
+# =============================================================================
+#  LIO (lio_node) config for Husky A300 (Ouster OS1-32 + /imu/data) — garage_roads2
+#  GNSS-denied localization, Stage B front-end.
+#
+#  Checked on the bag (garage_roads2):
+#    * /ouster/points is in os_lidar (yawed 180 deg vs. the robot) -> Rz(pi) below
+#      (the Sep-17 working config; an identity rotation here is WRONG)
+#    * /imu/data (imu_link, 400 Hz) carries a gravity-referenced AHRS orientation
+#      -> attitude.source 1 (the garage has ramps: never use the level-ground model)
+#    * IMU header stamps arrive in bursts (~4 samples within 0.06 ms, then ~10 ms)
+#    * ground ~0.78 m below the LiDAR
+# =============================================================================
+/**:
+    ros__parameters:
+        point_filter_num: 2            # keep good structure for 32-beam
+        max_iteration: 4
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0       # bounded local map
+        map_file_path: "./test.pcd"
+
+        common:
+            lid_topic:  "/ouster/points"
+            imu_topic:  "/imu/data"
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 3              # 2=Velodyne/Hesai, 3=Ouster, 5=Hesai
+            scan_line: 32
+            scan_rate: 10              # Ouster scan rate, Hz
+            timestamp_unit: 3          # 0=second, 1=ms, 2=us, 3=ns (Ouster `t` is ns)
+            blind: 0.5                 # drop returns within 0.5 m of the sensor
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            det_range:     100.0
+            imu_init_samples: 100      # static start-up samples for gravity + gyro bias (stock: 10)
+            extrinsic_est_en:  true    # online refinement (as in the working Sep-17 config)
+            # Husky A300: os_lidar w.r.t. the IMU
+            #   R = Rz(pi)  (os_lidar is yawed 180 deg relative to os_sensor / the robot)
+            extrinsic_T: [ -0.006253, 0.011775, 0.028535 ]
+            extrinsic_R: [ -1.0,  0.0,  0.0,
+                            0.0, -1.0,  0.0,
+                            0.0,  0.0,  1.0 ]
+
+        degeneracy:                    # solution remapping in the iEKF update (Zhang 2016)
+            enable: true               # identity in well-constrained scenes
+            trans_thresh: 0.01
+            rot_thresh: 0.01
+            soft: true
+            log: false
+
+        attitude:                      # gravity-referenced roll/pitch aiding
+            source: 1                  # IMU orientation (AHRS) — garage ramps rule out the level-ground model
+            kappa: 0.05
+            sigma_floor_deg: 2.0
+            max_angle_deg: 30.0
+
+        publish:
+            scan_publish_en:  true     # publish /lio/cloud_registered (odom frame)
+            dense_publish_en: true
+            scan_bodyframe_pub_en: false
+            effect_map_en: false
+            map_en: false
+
+        frames:                        # REP-105 output (published by backend_node): map -> odom -> base_frame
+            odom_frame: odom
+            base_frame: base_footprint
+            imu_frame: "imu_link"      # garage_roads2 has no /tf_static: base_link->imu_link as in garage_roads2/bag_tf_publisher.py
+            base_to_imu: [0.0, 0.0, 0.1, 0.0, 0.0, 0.0] # x y z roll pitch yaw of imu_frame in base_frame
+            publish_tf: true           # backend_node TF map->odom->base_frame (false: topics only)
+
+        pcd_save:
+            pcd_save_en: false

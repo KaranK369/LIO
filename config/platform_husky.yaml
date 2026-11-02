@@ -1,0 +1,175 @@
+# =============================================================================
+#  Husky A300 (Ouster OS1-32 + /imu/data), garage_roads2 — node parameters.
+#  Preprocessing as in the Sep-17 setup that localized well on this bag:
+#  ground segmentation + band, NO denoise / rigidity / dynamic removal.
+# =============================================================================
+cloud_preprocess:
+  ros__parameters:
+    enable_filtering: true
+    enable_denoise: false
+    denoise_azimuth_res_deg: 0.20
+    denoise_multiplier: 8.0
+    denoise_min_radius: 0.20
+    denoise_max_radius: 0.80
+    denoise_min_neighbors: 2
+    denoise_max_intensity: -1.0
+    denoise_min_range: 0.0
+    min_range: 0.8
+    max_range: 80.0
+    enable_intensity_filter: false
+    min_intensity: 3.0
+    drop_secondary_returns: true
+    enable_ground_seg: true
+    keep_ground: true
+    sensor_height: -1.0          # AUTO (measured ~0.78 m on garage_roads2; 0.53 sat at the edge of the gate)
+    ground_max_range: 60.0
+    ground_th_dist: 0.15
+    ground_th_seeds: 0.40
+    ground_uprightness: 0.80
+    ground_flatness: 0.02
+    ground_elevation_tol: 0.50
+    min_ground_bin_frac: 0.15    # below -> band filter skipped for the scan
+    band_min: 0.0
+    band_max: 3.0                # forest canopy cut; <= 0 = no upper cap
+    enable_rigidity: false
+    rigidity_radius: 0.4
+    rigidity_min_neighbors: 6
+    linearity_thresh: 0.55
+    planarity_thresh: 0.55
+    keep_sparse_points: true
+    enable_dynamic_removal: false
+    dynamic_debug: false
+    lidar_in_body_z: 0.029       # superseded by lidar_extrinsic_T/R from the LIO config
+    dynamic_keyframe_dist: 0.3
+    dynamic_keyframe_time: 1.0
+    dynamic_voxel_size: 0.40
+    dynamic_max_ray: 40.0
+    dynamic_ever_free_count: 3
+    dynamic_free_recency: 30
+    dynamic_min_cluster_points: 6
+    dynamic_max_cluster_extent: 4.0
+    dynamic_voxel_ttl: 200
+    adaptive_filtering: true     # SPARSE/POOR scene -> range crop only
+    adaptive_hold_sec: 5.0
+    adaptive_min_tier: 1
+
+landmark_node:
+  ros__parameters:
+    kf_dist: 1.0
+    kf_time: 2.0
+    work_radius: 30.0
+    band_min: 0.5
+    band_max: 2.5
+    pole_cell: 0.30
+    pole_min_points: 8
+    pole_min_diameter: 0.05
+    pole_max_diameter: 1.0
+    pole_min_height: 1.0
+    pole_max_footprint: 1.2
+    pole_aspect: 1.5
+    enable_planes: true
+    plane_min_height: 0.3
+    plane_ransac_dist: 0.10
+    plane_min_inliers: 100
+    plane_max_count: 15
+    plane_vertical_tol: 0.30
+    plane_min_extent: 1.2
+    assoc_pole_dist: 0.6
+    promote_hits: 3
+    forget_frames: 8
+
+loop_closure_node:
+  ros__parameters:
+    kf_dist: 1.0
+    kf_time: 2.0
+    work_radius: 60.0
+    sc_rings: 20
+    sc_sectors: 60
+    sc_max_radius: 60.0
+    sc_height_offset: 2.0
+    structure_height: 0.5        # descriptor informativeness gate
+    min_structured_bins: 15
+    min_structure_frac: 0.05
+    top_k: 10
+    sc_dist_thresh: 0.40
+    ringkey_gate: 1.0
+    min_loop_path: 50.0          # metres of TRAVEL between query and match
+    icp_leaf: 0.5
+    icp_max_points: 4000
+    icp_max_corr: 3.0
+    icp_iters: 30
+    submap_kf: 3
+    max_loop_translation: 5.0
+    inlier_dist: 0.5
+    min_overlap: 0.5
+    max_rmse: 0.25
+    drift_ratio: 0.05            # registration must agree with odometry within 5% of path
+    drift_floor: 2.0
+    drift_rot_ratio: 0.005
+    drift_rot_floor: 0.25
+    degen_trans_thresh: 0.02
+    degen_rot_thresh: 0.02
+    max_degenerate_trans_axes: 1
+    max_degenerate_rot_axes: 1
+    loop_sigma_xyz: 0.10
+    loop_sigma_rot: 0.02
+    pcm_trans_ratio: 0.03
+    pcm_trans_floor: 1.0
+    pcm_rot_ratio: 0.003
+    pcm_rot_floor: 0.10
+    pcm_min_clique: 2
+    skip_in_poor: false
+
+environment_router_node:
+  ros__parameters:
+    kf_dist: 1.0
+    kf_time: 2.0
+    work_radius: 30.0
+    pca_cell: 0.40
+    min_voxel_pts: 6
+    linearity_thresh: 0.50
+    planarity_thresh: 0.50
+    loc_window_sec: 1.0
+    loc_ref_trans: 0.10
+    loc_ref_rot: 0.10
+    poor_trans_eig: 0.01         # keep equal to LIO degeneracy.trans_thresh
+    poor_rot_eig: 0.01
+    sparse_trans_eig: 0.04
+    sparse_rot_eig: 0.04
+    tier_enter_kf: 1
+    tier_exit_kf: 3
+    min_struct_voxels: 25        # cloud fallback (no /localizability)
+    min_localizability: 8.0
+    poor_degeneracy: 0.85
+    rich_degeneracy: 0.55
+
+backend_node:
+  ros__parameters:
+    kf_dist: 1.0
+    kf_time: 2.0
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom            # = frames.odom_frame of the LIO config (launch passes it)
+    odom_sigma_xyz: 0.05
+    odom_sigma_rot: 0.01
+    odom_trans_ratio: 0.02
+    odom_rot_ratio: 0.02
+    loop_sigma_xyz: 0.20
+    loop_sigma_rot: 0.05
+    loop_chi2: 22.46
+    loop_post_chi2: 100.0
+    drift_ratio: 0.05
+    drift_floor: 1.0
+    drift_rot_ratio: 0.005
+    drift_rot_floor: 0.1
+    assoc_max_dt: 2.5
+    assoc_pos: 3.0               # landmark association only
+    lm_sigma_xy: 0.30
+    lm_sigma_z: 10.0
+    lm_robust_k: 0.5
+    heading_sigma: 0.15
+    mag_topic: /imu/mag
+    router_inflate_gain: 9.0     # max 10x LIO sigma along weak axes
+    router_deg_floor: 0.30
+    loc_ref_trans: 0.10
+    loc_ref_rot: 0.10

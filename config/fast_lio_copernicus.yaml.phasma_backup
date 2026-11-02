@@ -1,0 +1,54 @@
+# =============================================================================
+#  FAST-LIO2 config for Phasma Sensor Platform (HESAI PandarXT-32 + Alphasense IMU)
+#  Hilti Challenge / long_corridor bag
+#  GNSS-denied localization, Stage B front-end.
+# =============================================================================
+/**:
+    ros__parameters:
+        feature_extract_enable: false
+        point_filter_num: 2            # keep good structure for 32-beam
+        max_iteration: 4
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0       # bounded local map
+        runtime_pos_log_enable: false
+        map_file_path: "./test.pcd"
+
+        common:
+            lid_topic:  "/hesai/pandar"
+            imu_topic:  "/alphasense/imu"
+            time_sync_en: false        # stamps are already consistent; no soft sync
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 2              # 1=Livox, 2=Velodyne/Hesai, 3=Ouster
+            scan_line: 32
+            scan_rate: 10              # Hesai scan rate, Hz
+            timestamp_unit: 0          # 0=second, 1=ms, 2=us, 3=ns
+            blind: 0.5                 # drop returns within 0.5 m of the sensor
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            fov_degree:    360.0
+            det_range:     100.0
+            extrinsic_est_en:  false    # factory calibrated extrinsics
+            # Phasma sensor platform: PandarXT-32 w.r.t. imu_sensor_frame
+            extrinsic_T: [-0.001, -0.00855, 0.055]
+            extrinsic_R: [ 0.0, -1.0,  0.0,
+                          -1.0,  0.0,  0.0,
+                           0.0,  0.0, -1.0 ]
+
+        publish:
+            path_en:  true             # publish /path for trajectory inspection
+            scan_publish_en:  true     # publish /cloud_registered
+            dense_publish_en: true
+            scan_bodyframe_pub_en: true
+            effect_map_en: true        # publish /cloud_effected (inlier points used by iEKF)
+            map_en: true              # publish /Laser_map (full ikd-tree map; heavier)
+
+        pcd_save:
+            pcd_save_en: true         # do not dump the dense map to disk
+            interval: -1
